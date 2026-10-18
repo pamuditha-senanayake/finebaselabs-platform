@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowDownIcon, ArrowUpIcon, SearchIcon, SearchXIcon } from "lucide-react";
 
+import { listProducts } from "@/lib/api/products";
 import { listRefundRequests } from "@/lib/api/requests";
+import { subscribe } from "@/lib/api/realtime";
 import { listTransactions } from "@/lib/api/transactions";
 import { ACTIVE_REQUEST_STATUSES } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useRefundModal } from "@/hooks/use-refund-modal";
 import { useSession } from "@/hooks/use-session";
 import type {
+  Product,
   RefundRequest,
   Transaction,
   TransactionStatus,
 } from "@/lib/types";
+import { RequestRefundButton } from "@/components/dashboard/request-refund-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -34,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionStatusBadge } from "@/components/ui/transaction-status-badge";
+import { ProductTypeBadge } from "@/components/store/product-badges";
 
 type StatusFilter = TransactionStatus | "ALL";
 type SortDirection = "desc" | "asc";
@@ -48,6 +54,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [requests, setRequests] = useState<RefundRequest[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -64,31 +71,38 @@ export default function TransactionsPage() {
     const id = userId;
     let active = true;
 
-    async function load() {
-      setDataLoading(true);
+    async function load(showLoading = true) {
+      if (showLoading) setDataLoading(true);
       setError(null);
 
       try {
-        const [txns, reqs] = await Promise.all([
+        const [txns, reqs, prods] = await Promise.all([
           listTransactions(id),
           listRefundRequests(id),
+          listProducts({ includeInactive: true }),
         ]);
 
         if (!active) return;
 
         setTransactions(txns);
         setRequests(reqs);
+        setProducts(prods);
       } catch {
         if (active) setError("We couldn't load your transactions.");
       } finally {
-        if (active) setDataLoading(false);
+        if (active && showLoading) setDataLoading(false);
       }
     }
 
     void load();
 
+    const unsubscribe = subscribe(() => {
+      void load(false);
+    });
+
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [userId, reloadToken]);
 
@@ -129,6 +143,10 @@ export default function TransactionsPage() {
 
   const activeStatusFilter =
     STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label ?? "";
+
+  const productMap = useMemo(() => {
+    return new Map(products.map((product) => [product.id, product]));
+  }, [products]);
 
   function hasActiveRequest(transactionId: string): boolean {
     return requests.some(
@@ -261,7 +279,7 @@ export default function TransactionsPage() {
                   <tr className="border-b border-slate-800/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-2 font-medium">Date</th>
                     <th className="px-4 py-2 font-medium">Transaction ID</th>
-                    <th className="px-4 py-2 font-medium">Service</th>
+                    <th className="px-4 py-2 font-medium">Item</th>
                     <th className="px-4 py-2 font-medium">Amount</th>
                     <th className="px-4 py-2 font-medium">Status</th>
                     <th className="px-4 py-2 text-right font-medium">Action</th>
@@ -269,9 +287,9 @@ export default function TransactionsPage() {
                 </thead>
                 <tbody>
                   {visibleTransactions.map((transaction) => {
-                    const disabled =
-                      transaction.status !== "SUCCESS" ||
-                      hasActiveRequest(transaction.id);
+                    const product = transaction.productId
+                      ? productMap.get(transaction.productId)
+                      : undefined;
 
                     return (
                       <tr
@@ -292,13 +310,33 @@ export default function TransactionsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col">
-                            <span>{transaction.description}</span>
-                            {transaction.merchant && (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {product ? (
+                                <ProductTypeBadge type={product.type} />
+                              ) : null}
+                              {product ? (
+                                <Link
+                                  href={`/dashboard/store/${product.slug}`}
+                                  className="rounded-sm font-medium outline-none transition-colors hover:text-[#3B82F6] focus-visible:ring-2 focus-visible:ring-ring/60"
+                                >
+                                  {product.name}
+                                </Link>
+                              ) : (
+                                <span className="font-medium">
+                                  {transaction.description}
+                                </span>
+                              )}
+                            </div>
+                            {transaction.orderId ? (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {transaction.orderId}
+                              </span>
+                            ) : transaction.merchant ? (
                               <span className="text-xs text-muted-foreground">
                                 {transaction.merchant}
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -313,15 +351,15 @@ export default function TransactionsPage() {
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={disabled}
-                            onClick={() => onRequestRefund(transaction.id)}
-                          >
-                            Request Refund
-                          </Button>
+                          <div className="flex justify-end">
+                            <RequestRefundButton
+                              transaction={transaction}
+                              hasActiveRequest={hasActiveRequest(
+                                transaction.id,
+                              )}
+                              onRequestRefund={onRequestRefund}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );

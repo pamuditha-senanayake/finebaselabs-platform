@@ -9,8 +9,6 @@ export const ACTOR_LABELS: Record<EventActor, string> = {
   SYSTEM: "System",
   FINEBRAIN: "FineBrain",
   CUSTOMER: "Customer",
-  SUPPORT_AGENT: "Support Agent",
-  ADMIN: "Admin",
 };
 
 export function ActivityTimeline({

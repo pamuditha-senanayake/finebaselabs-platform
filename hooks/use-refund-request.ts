@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { getRefundRequest } from "@/lib/api/requests";
+import { getProduct } from "@/lib/api/products";
 import { subscribe } from "@/lib/api/realtime";
 import { getTransaction } from "@/lib/api/transactions";
-import type { RefundRequest, Transaction } from "@/lib/types";
+import type { Product, RefundRequest, Transaction } from "@/lib/types";
 
 export interface UseRefundRequestResult {
   request: RefundRequest | null;
   transaction: Transaction | null;
+  product: Product | null;
   isLoading: boolean;
   error: string | null;
   retry: () => void;
@@ -20,6 +22,7 @@ export function useRefundRequest(id: string): UseRefundRequestResult {
     | {
         request: RefundRequest | null;
         transaction: Transaction | null;
+        product: Product | null;
       }
     | undefined
   >(undefined);
@@ -37,10 +40,13 @@ export function useRefundRequest(id: string): UseRefundRequestResult {
         const transaction = request
           ? await getTransaction(request.transactionId)
           : null;
+        const product = transaction?.productId
+          ? await getProduct(transaction.productId)
+          : null;
 
         if (!active) return;
 
-        setResult({ request, transaction });
+        setResult({ request, transaction, product });
         setError(null);
       } catch {
         if (active) setError("We couldn't load this refund request.");
@@ -63,6 +69,7 @@ export function useRefundRequest(id: string): UseRefundRequestResult {
   return {
     request: result?.request ?? null,
     transaction: result?.transaction ?? null,
+    product: result?.product ?? null,
     isLoading: result === undefined && error === null,
     error,
     retry,

@@ -6,15 +6,17 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2Icon, PaperclipIcon, UploadIcon, XIcon } from "lucide-react";
+import { Loader2Icon, PaperclipIcon, TriangleAlertIcon, UploadIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { submitRefund } from "@/lib/api/requests";
+import { getProduct } from "@/lib/api/products";
+import { getRefundEligibility, submitRefund } from "@/lib/api/requests";
 import { RefundError } from "@/lib/errors";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { useSession } from "@/hooks/use-session";
-import type { Transaction } from "@/lib/types";
+import type { Product, Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { ProductTypeBadge } from "@/components/store/product-badges";
 import {
   Dialog,
   DialogContent,
@@ -161,6 +163,7 @@ export function RefundModal({
 }: RefundModalProps) {
   const { currentUser } = useSession();
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
   const submittingRef = useRef(false);
 
   const {
@@ -181,10 +184,30 @@ export function RefundModal({
     }
   }, [open, transaction?.id, reset]);
 
+  useEffect(() => {
+    let active = true;
+    const productId = transaction?.productId;
+
+    if (!open || !productId) {
+      setProduct(null);
+      return;
+    }
+
+    getProduct(productId).then((next) => {
+      if (active) setProduct(next);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [open, transaction?.productId]);
+
   const isOpen = open && transaction !== null;
+  const eligibility = transaction ? getRefundEligibility(transaction) : null;
+  const ineligible = eligibility !== null && !eligibility.eligible;
 
   async function onSubmit(values: RefundFormValues) {
-    if (!transaction || !currentUser) return;
+    if (!transaction || !currentUser || ineligible) return;
     if (submittingRef.current) return;
 
     submittingRef.current = true;
@@ -226,7 +249,8 @@ export function RefundModal({
     }
   }
 
-  const submitDisabled = isSubmitting || !transaction || !currentUser;
+  const submitDisabled =
+    isSubmitting || !transaction || !currentUser || ineligible;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -267,6 +291,78 @@ export function RefundModal({
               />
             </div>
           </div>
+
+          <div className="flex flex-col gap-4 rounded-lg border border-slate-800/60 p-4">
+            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Product &amp; policy
+            </span>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs tracking-wide text-muted-foreground uppercase">
+                  Product
+                </span>
+                {product ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ProductTypeBadge type={product.type} />
+                    <Link
+                      href={`/dashboard/store/${product.slug}`}
+                      className="text-sm font-medium outline-none transition-colors hover:text-[#3B82F6] focus-visible:ring-2 focus-visible:ring-ring/60"
+                    >
+                      {product.name}
+                    </Link>
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    Direct charge
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs tracking-wide text-muted-foreground uppercase">
+                  Purchase date
+                </span>
+                <span className="text-sm">
+                  {transaction ? formatDate(transaction.createdAt) : "—"}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs tracking-wide text-muted-foreground uppercase">
+                  Refund window
+                </span>
+                <span className="text-sm">
+                  {product
+                    ? product.refundable
+                      ? `${product.refundWindowDays} days`
+                      : "Non-refundable"
+                    : "—"}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs tracking-wide text-muted-foreground uppercase">
+                  Days left
+                </span>
+                <span className="text-sm">
+                  {eligibility?.daysLeft !== null &&
+                  eligibility?.daysLeft !== undefined
+                    ? `${eligibility.daysLeft} ${
+                        eligibility.daysLeft === 1 ? "day" : "days"
+                      }`
+                    : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {ineligible ? (
+            <p className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
+              {eligibility?.reason ??
+                "This transaction isn't eligible for a refund."}
+            </p>
+          ) : null}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="refund-reason-category">Reason Category</Label>

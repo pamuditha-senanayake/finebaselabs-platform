@@ -28,6 +28,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TransactionStatusBadge } from "@/components/ui/transaction-status-badge";
+import { ProductTypeBadge } from "@/components/store/product-badges";
 import { ActivityTimeline } from "@/components/dashboard/activity-timeline";
 
 type PaymentState = "pending" | "processing" | "completed" | "failed";
@@ -102,6 +103,7 @@ export default function RefundRequestDetailPage() {
   const {
     request,
     transaction,
+    product,
     isLoading: requestLoading,
     error,
     retry,
@@ -145,6 +147,23 @@ export default function RefundRequestDetailPage() {
     request.status === "PENDING_BRAIN_REVIEW" && !hasDecision;
   const payment = PAYMENT_STATE[getPaymentState(request.status)];
   const PaymentIcon = payment.icon;
+  const policy = product
+    ? product.refundable
+      ? `Refundable within ${product.refundWindowDays} days of purchase`
+      : "Non-refundable"
+    : null;
+  const daysSincePurchase = transaction
+    ? Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(transaction.createdAt).getTime()) /
+            86_400_000,
+        ),
+      )
+    : 0;
+  const daysLeft = product
+    ? Math.max(0, product.refundWindowDays - daysSincePurchase)
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -212,6 +231,61 @@ export default function RefundRequestDetailPage() {
                 }
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-4 rounded-lg border border-slate-800/60 p-4">
+            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Product details
+            </span>
+            {product ? (
+              <>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field
+                    label="Product"
+                    value={
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ProductTypeBadge type={product.type} />
+                        <Link
+                          href={`/dashboard/store/${product.slug}`}
+                          className="font-medium outline-none transition-colors hover:text-[#3B82F6] focus-visible:ring-2 focus-visible:ring-ring/60"
+                        >
+                          {product.name}
+                        </Link>
+                      </div>
+                    }
+                  />
+                  <Field label="Category" value={product.category} />
+                  <Field
+                    label="Price"
+                    value={formatCurrency(product.price, product.currency)}
+                  />
+                  <Field
+                    label="Purchase date"
+                    value={
+                      transaction ? formatDate(transaction.createdAt) : "—"
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-md border border-slate-800/60 bg-slate-950/40 p-3">
+                  <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Refund policy
+                  </span>
+                  <span className="text-sm">{policy}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {daysLeft !== null
+                      ? `${daysLeft} ${
+                          daysLeft === 1 ? "day" : "days"
+                        } left in the refund window at the time of review.`
+                      : "No time-based window applies to this item."}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                This request is not linked to a store product.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

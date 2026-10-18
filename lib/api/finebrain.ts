@@ -1,5 +1,9 @@
-import type { RefundRequest, TransactionStatus } from "@/lib/types";
-import { usePortalStore } from "@/lib/store";
+import type {
+  ProductType,
+  RefundRequest,
+  TransactionStatus,
+} from "@/lib/types";
+import { daysSincePurchase, usePortalStore } from "@/lib/store";
 import { mockUsers } from "@/lib/mock-data";
 import { clone, createId } from "@/lib/api/_shared";
 
@@ -14,7 +18,7 @@ export interface FineBrainCustomer {
 export interface FineBrainTransaction {
   id: string;
   reference: string;
-  amount: number;
+  amount: number; // decimal major units (e.g. 299.00) — FineBrain boundary
   currency: string;
   status: TransactionStatus;
   description: string;
@@ -22,14 +26,25 @@ export interface FineBrainTransaction {
   created_at: string;
 }
 
+export interface FineBrainProduct {
+  product_id: string;
+  name: string;
+  type: ProductType;
+  price: number; // decimal major units (e.g. 49.00) — FineBrain boundary
+  purchase_date: string;
+  days_since_purchase: number;
+  refund_window_days: number;
+}
+
 export interface RefundEvaluationRequest {
   type: "REFUND_EVALUATION_REQUEST";
   request_id: string;
   reason: string;
-  requested_amount: number;
+  requested_amount: number; // decimal major units (e.g. 299.00) — FineBrain boundary
   currency: string;
   customer: FineBrainCustomer;
   transaction: FineBrainTransaction | null;
+  product: FineBrainProduct | null;
   created_at: string;
 }
 
@@ -44,17 +59,26 @@ export interface FineBrainCallbackPayload {
 export async function sendToFineBrain(
   payload: RefundRequest,
 ): Promise<RefundEvaluationRequest> {
-  const { transactions } = usePortalStore.getState();
+  const { transactions, products } = usePortalStore.getState();
   const transaction = transactions.find(
     (item) => item.id === payload.transactionId,
   );
+  const product =
+    transaction?.productId !== undefined
+      ? products.find((item) => item.id === transaction.productId)
+      : undefined;
   const customer = mockUsers.find((user) => user.id === payload.userId);
+
+  // The store keeps amounts in minor units (cents). FineBrain's documented
+  // payload uses decimal major units (e.g. 299.00) — convert only here, at
+  // this boundary; everything internal stays in cents.
+  const toMajor = (minor: number) => minor / 100;
 
   const request: RefundEvaluationRequest = {
     type: "REFUND_EVALUATION_REQUEST",
     request_id: payload.id,
     reason: payload.reason,
-    requested_amount: payload.amount,
+    requested_amount: toMajor(payload.amount),
     currency: payload.currency,
     customer: customer
       ? { id: customer.id, name: customer.name, email: customer.email }
@@ -63,7 +87,7 @@ export async function sendToFineBrain(
       ? {
           id: transaction.id,
           reference: transaction.reference,
-          amount: transaction.amount,
+          amount: toMajor(transaction.amount),
           currency: transaction.currency,
           status: transaction.status,
           description: transaction.description,
@@ -71,6 +95,18 @@ export async function sendToFineBrain(
           created_at: transaction.createdAt.toISOString(),
         }
       : null,
+    product:
+      product && transaction
+        ? {
+            product_id: product.id,
+            name: product.name,
+            type: product.type,
+            price: toMajor(product.price),
+            purchase_date: transaction.createdAt.toISOString(),
+            days_since_purchase: daysSincePurchase(transaction.createdAt),
+            refund_window_days: product.refundWindowDays,
+          }
+        : null,
     created_at: payload.createdAt.toISOString(),
   };
 
@@ -119,6 +155,16 @@ export async function applyBrainDecision(
     createdAt: Number.isNaN(eventTime.getTime()) ? new Date() : eventTime,
   });
 
+  if (status === "REJECTED") {
+    const transaction = usePortalStore
+      .getState()
+      .transactions.find((item) => item.id === request.transactionId);
+
+    if (transaction?.status === "REFUND_REQUESTED") {
+      store.setTransactionStatus(request.transactionId, "SUCCESS");
+    }
+  }
+
   const updated = usePortalStore
     .getState()
     .requests.find((item) => item.id === request.id);
@@ -160,7 +206,7 @@ export async function executePayment(
       message: "Refund completed.",
       createdAt: new Date(),
     });
-    store.setTransactionStatus(request.transactionId, "REFUNDED");
+    store.refundTransaction(request.transactionId);
   }
 
   const updated = usePortalStore
