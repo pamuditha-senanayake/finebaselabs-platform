@@ -28,7 +28,6 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 const DEMO_ACCOUNTS: { role: DemoRole; label: string }[] = [
   { role: "CUSTOMER", label: "Login as Demo Customer" },
-  { role: "ADMIN", label: "Login as Demo Admin" },
 ];
 
 export default function LoginPage() {
@@ -52,7 +51,7 @@ export default function LoginPage() {
 
     try {
       await login(values.email, values.password);
-      router.replace("/dashboard");
+      router.replace("/dashboard/store");
     } catch (error) {
       setFormError(
         error instanceof Error

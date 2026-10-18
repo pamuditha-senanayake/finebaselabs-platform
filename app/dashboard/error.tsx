@@ -25,8 +25,8 @@ export default function DashboardError({
             Something went wrong
           </h1>
           <p className="max-w-md text-sm text-muted-foreground">
-            We couldn&apos;t load this page. Try again, or head back to your
-            dashboard.
+            We couldn&apos;t load this page. Try again, or head back to the
+            store.
           </p>
           {error.digest ? (
             <p className="font-mono text-xs text-slate-500">
@@ -41,7 +41,7 @@ export default function DashboardError({
             Try again
           </Button>
           <Button type="button" variant="outline" asChild>
-            <Link href="/dashboard">Back to dashboard</Link>
+            <Link href="/dashboard/store">Back to store</Link>
           </Button>
         </div>
       </CardContent>

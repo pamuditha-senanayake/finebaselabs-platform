@@ -6,34 +6,37 @@ import { usePathname } from "next/navigation";
 import {
   BoxesIcon,
   FileClockIcon,
-  LayoutDashboardIcon,
   MenuIcon,
   ReceiptTextIcon,
-  ShieldCheckIcon,
+  ShoppingCartIcon,
+  StoreIcon,
+  UserIcon,
   XIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { useCart } from "@/hooks/use-cart";
 import { useSession } from "@/hooks/use-session";
-import { LogoutButton } from "@/components/auth/logout-button";
-import { Badge } from "@/components/ui/badge";
+import { UserMenu } from "@/components/dashboard/user-menu";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import type { Role } from "@/lib/types";
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  roles?: Role[];
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
+  {
+    href: "/dashboard/store",
+    label: "Store",
+    icon: StoreIcon,
+  },
   {
     href: "/dashboard/transactions",
-    label: "Transactions",
+    label: "Purchases",
     icon: ReceiptTextIcon,
   },
   {
@@ -42,25 +45,49 @@ const NAV_ITEMS: NavItem[] = [
     icon: FileClockIcon,
   },
   {
-    href: "/admin/review-queue",
-    label: "Review Queue",
-    icon: ShieldCheckIcon,
-    roles: ["ADMIN", "SUPPORT_AGENT"],
+    href: "/dashboard/account",
+    label: "Account",
+    icon: UserIcon,
   },
 ];
 
-const ROLE_LABELS: Record<Role, string> = {
-  CUSTOMER: "Customer",
-  ADMIN: "Admin",
-  SUPPORT_AGENT: "Support Agent",
-};
-
 function isActiveRoute(pathname: string, href: string): boolean {
-  if (href === "/dashboard") {
-    return pathname === "/dashboard";
-  }
-
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function formatCartCount(count: number): string {
+  return count > 9 ? "9+" : String(count);
+}
+
+function HeaderCartButton() {
+  const { currentUser } = useSession();
+  const { itemCount } = useCart(currentUser?.id);
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="relative"
+      asChild
+    >
+      <Link
+        href="/dashboard/cart"
+        aria-label={
+          itemCount > 0
+            ? `Cart, ${itemCount} item${itemCount === 1 ? "" : "s"}`
+            : "Cart"
+        }
+      >
+        <ShoppingCartIcon className="size-5" />
+        {itemCount > 0 ? (
+          <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-[#3B82F6] px-1 text-[10px] leading-4 font-semibold text-white">
+            {formatCartCount(itemCount)}
+          </span>
+        ) : null}
+      </Link>
+    </Button>
+  );
 }
 
 function SidebarContent({
@@ -71,17 +98,12 @@ function SidebarContent({
   onClose?: () => void;
 }) {
   const pathname = usePathname();
-  const { role } = useSession();
-
-  const items = NAV_ITEMS.filter(
-    (item) => !item.roles || (role && item.roles.includes(role)),
-  );
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center justify-between gap-2 border-b border-slate-800/60 px-5">
         <Link
-          href="/dashboard"
+          href="/dashboard/store"
           onClick={onNavigate}
           className="flex items-center gap-2 rounded-md text-base font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
         >
@@ -103,7 +125,7 @@ function SidebarContent({
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-3">
-        {items.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = isActiveRoute(pathname, item.href);
           const Icon = item.icon;
 
@@ -141,7 +163,6 @@ function SidebarContent({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { currentUser, role, isLoading } = useSession();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -186,19 +207,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <MenuIcon className="size-5" />
           </Button>
 
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden flex-col items-end sm:flex">
-              <span className="text-sm leading-tight font-medium">
-                {isLoading ? "…" : (currentUser?.name ?? "Guest")}
-              </span>
-              {role && (
-                <Badge variant="secondary" className="mt-0.5">
-                  {ROLE_LABELS[role]}
-                </Badge>
-              )}
-            </div>
-
-            <LogoutButton />
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <HeaderCartButton />
+            <UserMenu />
           </div>
         </header>
 

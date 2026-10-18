@@ -24,7 +24,7 @@ export default function Error({
         </h1>
         <p className="max-w-md text-sm text-muted-foreground">
           An unexpected error occurred while rendering this page. Try again, or
-          head back to your dashboard.
+          head back to the store.
         </p>
         {error.digest ? (
           <p className="font-mono text-xs text-slate-500">
@@ -39,7 +39,7 @@ export default function Error({
           Try again
         </Button>
         <Button type="button" variant="outline" asChild>
-          <Link href="/dashboard">Back to dashboard</Link>
+          <Link href="/dashboard/store">Back to store</Link>
         </Button>
       </div>
     </div>

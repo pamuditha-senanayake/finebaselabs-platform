@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { RefreshCwIcon, TriangleAlertIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,7 @@ export default function GlobalError({
               Something went wrong
             </h1>
             <p className="max-w-md text-sm text-slate-400">
-              A critical error occurred. Try again, or head back to your
-              dashboard.
+              A critical error occurred. Try again, or head back to the store.
             </p>
             {error.digest ? (
               <p className="font-mono text-xs text-slate-500">
@@ -40,7 +40,7 @@ export default function GlobalError({
               Try again
             </Button>
             <Button type="button" variant="outline" asChild>
-              <a href="/dashboard">Back to dashboard</a>
+              <Link href="/dashboard/store">Back to store</Link>
             </Button>
           </div>
         </div>
