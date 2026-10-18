@@ -1,4 +1,4 @@
-export type Role = "CUSTOMER" | "ADMIN" | "SUPPORT_AGENT";
+export type Role = "CUSTOMER";
 
 export type RequestStatus =
   | "PENDING_BRAIN_REVIEW"
@@ -11,16 +11,15 @@ export type RequestStatus =
 
 export type TransactionStatus = "SUCCESS" | "REFUND_REQUESTED" | "REFUNDED";
 
-export type EventActor =
-  | "SYSTEM"
-  | "FINEBRAIN"
-  | "CUSTOMER"
-  | "SUPPORT_AGENT"
-  | "ADMIN";
+export type EventActor = "SYSTEM" | "FINEBRAIN" | "CUSTOMER";
 
 export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type ProductType = "SERVICE" | "PRODUCT";
+
+export type OrderStatus = "PAID" | "REFUNDED" | "PARTIALLY_REFUNDED";
 
 export interface User {
   id: string;
@@ -41,6 +40,8 @@ export interface Transaction {
   reference: string;
   createdAt: Date;
   updatedAt: Date;
+  productId?: string;
+  orderId?: string;
 }
 
 export interface RequestEvent {
@@ -76,4 +77,43 @@ export interface Ticket {
   priority: TicketPriority;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  type: ProductType;
+  category: string;
+  price: number; // minor units (cents)
+  currency: string;
+  refundable: boolean;
+  refundWindowDays: number;
+  stock: number | null; // null for services
+  active: boolean;
+  createdAt: Date;
+}
+
+export interface CartItem {
+  productId: string;
+  quantity: number;
+}
+
+export interface OrderItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number; // minor units (cents)
+  currency: string;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  items: OrderItem[];
+  total: number; // minor units (cents)
+  currency: string;
+  status: OrderStatus;
+  createdAt: Date;
 }
