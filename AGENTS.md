@@ -16,11 +16,36 @@ Dark-only. Do not add light mode or theme toggles.
 - Accent: `#3B82F6`
 - Success: `#10B981`
 
+## Platform direction
+
+This section is authoritative: where other sections of this file or
+`README.md` describe admin, support or demo-tooling behaviour, they describe
+what must not be built here.
+
+- This repo is a **customer-only purchasing platform**. Admin and support
+  functionality lives in the separate **FineBrain platform** and must not
+  exist here — no `/admin/*` routes, no review queues, no product
+  administration, no support tooling in this codebase.
+- The only role is `CUSTOMER`. Do not add any other roles, role switchers,
+  or role-gated UI.
+- The landing page after login is `/dashboard/store` (not `/dashboard`).
+- Sidebar navigation is exactly: **Store**, **Purchases**
+  (`/dashboard/transactions`), **Refund Requests**, **Account**
+  (`/dashboard/account`).
+- The cart is a **header icon** (with badge), not a sidebar entry.
+- The old Overview page is **merged into the Account page** — `/dashboard`
+  should not exist as a separate overview; account/profile, and any overview
+  metrics, live on `/dashboard/account`.
+- `ESCALATED_HUMAN` is shown to customers as **"Under review"** with **no
+  actions** available. It is resolved only by a FineBrain decision callback
+  (`applyBrainDecision`) — never by any in-portal admin/support action.
+- A customer-facing **assistant UI** exists (mock only; no real backend).
+- **No demo toolbar.** Do not add demo toolbars, role switchers, or
+  simulate-decision panels to the UI.
+
 ## Roles
 
 - `CUSTOMER`
-- `ADMIN`
-- `SUPPORT_AGENT`
 
 ## Statuses
 
@@ -38,7 +63,6 @@ Dark-only. Do not add light mode or theme toggles.
 - `/dashboard`
 - `/dashboard/requests`
 - `/dashboard/requests/[id]`
-- `/admin/review-queue`
 
 ## Data Model
 
@@ -48,8 +72,6 @@ The target Prisma schema. `lib/types.ts` mirrors these models; mock data in
 ```prisma
 enum Role {
   CUSTOMER
-  ADMIN
-  SUPPORT_AGENT
 }
 
 enum RequestStatus {
@@ -72,8 +94,6 @@ enum EventActor {
   SYSTEM
   FINEBRAIN
   CUSTOMER
-  SUPPORT_AGENT
-  ADMIN
 }
 
 enum TicketStatus {
@@ -162,8 +182,14 @@ model Ticket {
 ## FineBrain Integration
 
 The portal never calls FineBrain directly; the backend owns the integration.
-The portal builds and sends these two documented shapes. Amounts are in minor
-units (cents).
+The portal builds and sends these two documented shapes.
+
+**Units at the FineBrain boundary:** the internal data model (Prisma,
+`lib/types.ts`, `lib/store.ts`, `lib/api/*`) stores amounts as integer minor
+units (cents). The `REFUND_EVALUATION_REQUEST` payload uses decimal major
+units (e.g. `299.00`) to match the FineBrain spec. The conversion happens only
+in `lib/api/finebrain.ts#sendToFineBrain` — never store or compute in major
+units elsewhere.
 
 `REFUND_EVALUATION_REQUEST` — portal → FineBrain, built by
 `lib/api/finebrain.ts#sendToFineBrain`:
@@ -173,22 +199,35 @@ units (cents).
   "type": "REFUND_EVALUATION_REQUEST",
   "request_id": "rfr_...",
   "reason": "Annual subscription — duplicate charge",
-  "requested_amount": 29900,
+  "requested_amount": 299.00,
   "currency": "USD",
   "customer": { "id": "usr_...", "name": "Alex Morgan", "email": "client@finebase.com" },
   "transaction": {
     "id": "txn_...",
     "reference": "TXN-2026-0002",
-    "amount": 29900,
+    "amount": 299.00,
     "currency": "USD",
     "status": "REFUND_REQUESTED",
     "description": "Annual subscription — duplicate charge",
     "merchant": "FineBase Cloud",
     "created_at": "2026-03-02T09:14:00.000Z"
   },
+  "product": {
+    "product_id": "prd_...",
+    "name": "Managed Cloud Hosting",
+    "type": "SERVICE",
+    "price": 49.00,
+    "purchase_date": "2026-03-02T09:14:00.000Z",
+    "days_since_purchase": 0,
+    "refund_window_days": 14
+  },
   "created_at": "2026-03-02T09:22:00.000Z"
 }
 ```
+
+`product` is included for store purchases, linking the refund to the catalog
+item; it is `null` for transactions that did not originate from the store.
+`type` is `SERVICE` or `PRODUCT`.
 
 Decision callback — FineBrain → portal, handled by
 `lib/api/finebrain.ts#applyBrainDecision`:
@@ -215,3 +254,39 @@ applies a decision — it never drives payment. Payment (and the resulting
 ## Backend
 
 - No backend yet. `lib/api/*` provides the abstraction layer over mock data.
+
+## Store / Commerce
+
+### Routes
+
+- `/dashboard/store` — catalog listing
+- `/dashboard/store/[slug]` — product detail
+- `/dashboard/cart` — cart
+- `/dashboard/checkout` — checkout
+- `/dashboard/checkout/success` — order confirmation
+
+### Models
+
+Follow the existing Prisma/`lib/types.ts` conventions (amounts in minor units,
+`currency` string defaulting to `"USD"`, `Date` fields in TS).
+
+- `Product`: `type` is `SERVICE` or `PRODUCT`; `price` (minor units),
+  `currency`, `refundable` (bool), `refundWindowDays`, `stock`, `active`.
+- `CartItem`: user-scoped cart line (product, quantity).
+- `Order` and `OrderItem`: an order snapshot with per-line items (product,
+  quantity, unit price).
+
+A purchase creates a `Transaction` linked by `productId` / `orderId`, so store
+purchases flow through the same refund pipeline as existing transactions.
+
+### Conventions
+
+- Refund eligibility for store purchases (product `refundable`,
+  `refundWindowDays`, stock/order state) is enforced inside `lib/api/*` — never
+  only in the UI.
+- Checkout never collects card data: the pay step is a mock confirmation.
+  TODO: replace with a hosted Stripe / PayPal checkout.
+- Components never import `lib/store` or `lib/mock-data` directly; all data
+  access goes through `lib/api/*`, matching the existing seam.
+- Follow the existing amount/currency convention: integer minor units (cents)
+  plus a `currency` string, as in `Transaction` and `RefundRequest`.
