@@ -134,3 +134,125 @@
     @apply font-sans;
   }
 }
+
+/* Assistant overlay — the orange palette here is scoped to the assistant
+   only; the rest of the portal keeps the blue theme. */
+.assistant-orb {
+  position: relative;
+  width: 9rem;
+  height: 9rem;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fdba74 0%,
+    #f97316 38%,
+    #c2410c 68%,
+    #7c2d12 100%
+  );
+  box-shadow:
+    0 0 60px 8px rgb(249 115 22 / 0.35),
+    inset 0 -12px 30px rgb(124 45 18 / 0.55);
+}
+
+.assistant-orb-glow {
+  position: absolute;
+  inset: -12%;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 200deg,
+    rgb(251 146 60 / 0.85) 290deg,
+    transparent 360deg
+  );
+  opacity: 0;
+  filter: blur(10px);
+}
+
+.assistant-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid rgb(249 115 22 / 0.55);
+  opacity: 0;
+}
+
+@keyframes assistant-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes assistant-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 40px 4px rgb(249 115 22 / 0.25),
+      inset 0 -12px 30px rgb(124 45 18 / 0.55);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow:
+      0 0 80px 16px rgb(249 115 22 / 0.5),
+      inset 0 -12px 30px rgb(124 45 18 / 0.55);
+  }
+}
+
+@keyframes assistant-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes assistant-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.assistant-orb--idle {
+  animation: assistant-breathe 5s ease-in-out infinite;
+}
+
+.assistant-orb--listening {
+  animation: assistant-pulse 1.4s ease-in-out infinite;
+}
+
+.assistant-orb--thinking .assistant-orb-glow {
+  opacity: 1;
+  animation: assistant-spin 2.4s linear infinite;
+}
+
+.assistant-orb--speaking .assistant-orb-ring {
+  animation: assistant-ripple 1.8s ease-out infinite;
+}
+
+.assistant-orb--speaking .assistant-orb-ring--2 {
+  animation-delay: 0.6s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-orb,
+  .assistant-orb-glow,
+  .assistant-orb-ring {
+    animation: none !important;
+  }
+  .assistant-orb--thinking .assistant-orb-glow {
+    opacity: 0.4;
+  }
+  .assistant-orb--speaking .assistant-orb-ring {
+    opacity: 0.35;
+    transform: scale(1.3);
+  }
+}

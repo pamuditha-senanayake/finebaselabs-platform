@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
-import { DemoToolbar } from "@/components/dashboard/demo-toolbar";
+import { AssistantLauncher } from "@/components/assistant/assistant-launcher";
 
 export default function DashboardLayout({
   children,
@@ -9,9 +9,9 @@ export default function DashboardLayout({
   children: ReactNode;
 }) {
   return (
-    <>
-      <AppShell>{children}</AppShell>
-      <DemoToolbar />
-    </>
+    <AppShell>
+      {children}
+      <AssistantLauncher />
+    </AppShell>
   );
 }
