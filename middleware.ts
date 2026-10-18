@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
 
   if (pathname === "/login") {
     if (isAuthenticated) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/dashboard/store", request.url));
     }
 
     return NextResponse.next();
@@ -20,16 +20,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const canAccessAdmin =
-    session.role === "ADMIN" || session.role === "SUPPORT_AGENT";
-
-  if (pathname.startsWith("/admin") && !canAccessAdmin) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/login"],
+  matcher: ["/dashboard/:path*", "/login"],
 };

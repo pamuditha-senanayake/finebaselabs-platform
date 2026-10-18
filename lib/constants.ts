@@ -6,3 +6,5 @@ export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
   "PROCESSING",
   "ESCALATED_HUMAN",
 ];
+
+export const MAX_REJECTED_REFUND_ATTEMPTS = 2;

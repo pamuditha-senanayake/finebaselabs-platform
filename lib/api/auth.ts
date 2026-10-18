@@ -5,8 +5,6 @@ const AUTH_ENDPOINT = "/api/mock-auth";
 
 export const demoAccounts = {
   CUSTOMER: { email: "client@finebase.com", password: DEMO_PASSWORD },
-  ADMIN: { email: "admin@finebase.com", password: DEMO_PASSWORD },
-  SUPPORT_AGENT: { email: "support@finebase.com", password: DEMO_PASSWORD },
 } as const;
 
 export type DemoRole = keyof typeof demoAccounts;

@@ -5,7 +5,7 @@ import type { Role, User } from "@/lib/types";
 // server-side secret before this is used in production.
 export const SESSION_COOKIE_NAME = "finebase_session";
 
-const VALID_ROLES: Role[] = ["CUSTOMER", "ADMIN", "SUPPORT_AGENT"];
+const VALID_ROLES: Role[] = ["CUSTOMER"];
 
 export function encodeSession(user: User): string {
   return encodeURIComponent(JSON.stringify(user));

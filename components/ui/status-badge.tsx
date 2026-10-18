@@ -30,7 +30,7 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; className: string }>
       className: "border-[#3B82F6]/40 bg-[#3B82F6]/10 text-[#3B82F6]",
     },
     ESCALATED_HUMAN: {
-      label: "Escalated to Human",
+      label: "Under review",
       className: "border-purple-500/40 bg-purple-500/10 text-purple-400",
     },
   };
